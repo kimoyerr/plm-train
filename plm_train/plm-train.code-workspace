@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../torchtitan"
+		}
+	],
+	"settings": {
+		"taipyStudio.config.mainPythonFile": "plm-train/setup.py"
+	}
+}
