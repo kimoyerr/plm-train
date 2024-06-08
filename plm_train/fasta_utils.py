@@ -33,13 +33,15 @@ def sample_seqs(input_fasta, n_seq=100):
                 # Read without new line characters
                 tmp_seq += line.strip()
                 
+    # Set random seed
+    random.seed(42)
     # Sample n_seq sequences
     sampled_seqs = random.sample(seqs, n_seq)
     
     return sampled_seqs
 
 
-def fasta_to_json(input_fasta, output_json, n_seq=100):
+def fasta_to_json(input_fasta, train_json, val_json, ntrain_seq=100, nval_seq=100, random_seed=42):
     """Write n_seq sequences from input_fasta to output_json
 
     Args:
@@ -51,11 +53,19 @@ def fasta_to_json(input_fasta, output_json, n_seq=100):
         str: output_cjson file path
     """
 
-    protein_data = sample_seqs(input_fasta, n_seq=n_seq)
+    protein_data = sample_seqs(input_fasta, n_seq=ntrain_seq + nval_seq)
     # Create a dictionary with "seq" and "id" keys
     protein_data = [protein._asdict() for protein in protein_data]
+    # Random shuffle
+    random.seed(random_seed)
+    random.shuffle(protein_data)
+    # Split into training and validation data
+    protein_data_train = protein_data[:ntrain_seq]
+    protein_data_val = protein_data[ntrain_seq:(ntrain_seq + nval_seq)]
     # Write to json with "seq" and "id" keys
-    with open(output_json, "w") as f:
-        json.dump(protein_data, f)
+    with open(train_json, "w") as f:
+        json.dump(protein_data_train, f)
+    with open(val_json, "w") as f:
+        json.dump(protein_data_val, f)
     
-    return output_json
+    return train_json, val_json
