@@ -68,5 +68,5 @@ def build_optimizer(model, job_config: JobConfig):
 
 
 # loss fn can be shared by pipeline-parallel or non-pp execution
-def loss_fn(pred, labels):
-    return F.cross_entropy(pred.flatten(0, 1), labels.flatten(0, 1))
+def loss_fn(pred, labels, reduction="mean"):
+    return F.cross_entropy(pred.flatten(0, 1), labels.flatten(0, 1), reduction=reduction)
