@@ -24,6 +24,7 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
         dataset_path (Optional[str]):
             Path to the dataset in the file system. If provided, data will be loaded
             from this path instead of downloaded.
+        dataset_split (Optional[str]): name of the dataset split to load
         tokenizer (Tokenizer):
             Tokenizer used to encode data. Tokenize must implement an `encode` and `decode` method.
         seq_len (int): max sequence length
@@ -37,6 +38,7 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
         self,
         dataset_name: str,
         dataset_path: Optional[str],
+        dataset_split: Optional[str],
         tokenizer: Tokenizer,
         seq_len: int = 2048,
         world_size: int = 1,
@@ -45,14 +47,14 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
     ) -> None:
 
         logger.info(f"Preparing {dataset_name} dataset from {dataset_path}")
-        ds = load_dataset(dataset_path, split="train")
-
+        ds = load_dataset(dataset_path, split=dataset_split)
         # TODO: support shuffling and checkpointing
         self.dataset_name = dataset_name
         self._data = split_dataset_by_node(ds, rank, world_size)
         self._tokenizer = tokenizer
         self.seq_len = seq_len
         self.infinite = infinite
+        self.num_repeats = 0
 
         # variables for checkpointing
         self._sample_idx = 0
@@ -82,6 +84,7 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
             else:
                 # Reset offset for the next iteration
                 self._sample_idx = 0
+                self.num_repeats += 1
                 logger.warning(
                     f"Dataset {self.dataset_name} is being re-looped. "
                     "Loss related metrics might be misleading."
@@ -142,6 +145,7 @@ class DPAwareDataLoader(StatefulDataLoader, Stateful):
 def build_hf_data_loader(
     dataset_name: str,
     dataset_path: Optional[str],
+    dataset_split: Optional[str],
     tokenizer: Tokenizer,
     batch_size: int,
     seq_len: int,
@@ -150,7 +154,7 @@ def build_hf_data_loader(
     infinite: bool = True,
 ):
     hf_ds = HuggingFaceProteinDataset(
-        dataset_name, dataset_path, tokenizer, seq_len, world_size, rank, infinite
+        dataset_name, dataset_path, dataset_split, tokenizer, seq_len, world_size, rank, infinite
     )
 
     return DPAwareDataLoader(rank, hf_ds, batch_size=batch_size)
