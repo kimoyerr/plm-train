@@ -1,4 +1,4 @@
-# Dependencies
+# Dependencies: If you already have an existing Torch installation and CUDA setup
 1. Torchtitan:
 ```
 cd /workspace/torchtitan
