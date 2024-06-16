@@ -1,4 +1,5 @@
 absl-py==2.1.0
+accelerate @ git+https://github.com/huggingface/accelerate@a9869ea0dc49652e49607d5f111caed79ed5cb67
 aiohttp==3.9.5
 aiosignal==1.3.1
 alembic==1.13.1
@@ -13,6 +14,7 @@ async-timeout==4.0.3
 attrs==23.2.0
 Babel==2.14.0
 beautifulsoup4==4.12.3
+bitsandbytes==0.43.1
 bleach==6.1.0
 blinker==1.8.2
 blobfile==2.1.1
@@ -23,6 +25,7 @@ charset-normalizer==3.3.2
 click==8.1.7
 cloudpickle==3.0.0
 comm==0.2.1
+-e /workspace/ConFit
 contourpy==1.2.1
 cycler==0.12.1
 datasets==2.19.2
@@ -31,10 +34,12 @@ decorator==5.1.1
 defusedxml==0.7.1
 Deprecated==1.2.14
 dill==0.3.8
+-e /workspace/DisCo-CLIP
 docker==7.1.0
 entrypoints==0.4
 exceptiongroup==1.2.0
 executing==2.0.1
+fastcore==1.5.45
 fastjsonschema==2.19.1
 filelock==3.13.1
 Flask==3.0.3
@@ -125,6 +130,7 @@ packaging==23.2
 pandas==2.2.2
 pandocfilters==1.5.1
 parso==0.8.3
+peft @ git+https://github.com/huggingface/peft.git@47b3d7422ab391e9a98191d4c8d41c4ae13da963
 pexpect==4.9.0
 pillow==10.2.0
 platformdirs==4.2.0
@@ -174,11 +180,11 @@ tiktoken==0.7.0
 tinycss2==1.2.1
 tokenizers==0.19.1
 tomli==2.0.1
-torch==2.4.0.dev20240607+cu121
-torchaudio==2.4.0.dev20240607+rocm6.1
+torch==2.4.0.dev20240610+cu121
+torchaudio==2.4.0.dev20240610+cu121
 torchdata==0.7.1
 -e git+https://github.com/pytorch/torchtitan@1ceaa4e2adc8ef5a0864f99e126e4ab18cd7db8f#egg=torchtitan
-torchvision==0.19.0.dev20240607+cu121
+torchvision==0.19.0.dev20240610+cu121
 tornado==6.4
 tqdm==4.66.4
 traitlets==5.14.1

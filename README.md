@@ -10,8 +10,26 @@ pip install -e .
 pip3 install transformers
 
 # Remove blinker installed using apt-get to be able to pip install mlflow
-apt-get --purge autoremove python3-blinker
+apt-get --purge autoremove python3-blinker -y
 pip3 install mlflow
+
+# Accelerate and PEFT for finetuning
+pip3 install safetensors
+pip3 install git+https://github.com/huggingface/accelerate
+pip3 install git+https://github.com/huggingface/peft.git
+pip3 install bitsandbytes
+pip3 install fastcore
+pip3 install biopython
+pip3 install wandb
+pip3 install seaborn
+
+# Install confit
+cd /workspace/ConFit
+pip install -e .
+
+# Install DIsco
+cd /workspace/DisCo-CLIP
+pip install -e .
 ```
 
 # Tracking using MLFlow
