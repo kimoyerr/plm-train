@@ -1,10 +1,10 @@
-# Dependencies: If you already have an existing Torch installation and CUDA setup
-1. Torchtitan:
+# Dependencies: If you already have CUDA setup
+1. Pre-Training using Torchtitan:
 ```
 cd /workspace/torchtitan
-pip install -r requirements.txt
-pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121 -U
-pip3 install --pre torchdata --extra-index-url https://download.pytorch.org/whl/nightly/cu121 -U
+pip3 install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu121 --upgrade
+pip3 install --pre torchdata --index-url https://download.pytorch.org/whl/nightly
+pip3 install -r requirements.txt
 pip install -e .
 
 pip3 install transformers
@@ -13,7 +13,15 @@ pip3 install transformers
 apt-get --purge autoremove python3-blinker -y
 pip3 install mlflow
 
-# Accelerate and PEFT for finetuning
+# Biopython
+pip3 install biopython
+
+# Wandb
+pip3 install wandb
+```
+# Installation for Accelerate and PEFT for finetuning
+2. Finetuning Using Accelerate and PEFT
+```
 pip3 install safetensors
 pip3 install git+https://github.com/huggingface/accelerate
 pip3 install git+https://github.com/huggingface/peft.git
