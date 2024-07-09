@@ -23,6 +23,7 @@ class ModelArgs:
     norm_eps: float = 1e-5
     pos_emb_type: str = "rope"
     rope_theta: float = 10000
+    final_output: str = "amino-acids"
 
     max_batch_size: int = 32
     max_seq_len: int = 2048
@@ -408,9 +409,13 @@ class Transformer(nn.Module):
         super().__init__()
         self.model_args = model_args
         self.vocab_size = model_args.vocab_size
+        self.catalytic_vocab_size = model_args.catalytic_vocab_size
         self.n_layers = model_args.n_layers
 
+        
+
         self.tok_embeddings = nn.Embedding(model_args.vocab_size, model_args.dim)
+        self.catalytic_tok_embeddings = nn.Embedding(model_args.catalytic_vocab_size, model_args.dim)
 
         # TODO persistent should be set to false, since this buffer can be recomputed.
         # however, we set it to true for 2 reasons.  (1) due to pytorch/pytorch#123411,
@@ -429,7 +434,10 @@ class Transformer(nn.Module):
             model_args.norm_type, dim=model_args.dim, eps=model_args.norm_eps
         )
 
-        self.output = nn.Linear(model_args.dim, model_args.vocab_size, bias=False)
+        if self.model_args.final_output == "amino-acids":
+            self.output = nn.Linear(model_args.dim, self.model_args.vocab_size, bias=False)
+        elif self.model_args.final_output == "catalytic-sites":
+            self.output = nn.Linear(model_args.dim, self.model_args.catalytic_vocab_size, bias=False)
         self.init_weights()
 
     def init_weights(self):
@@ -447,6 +455,7 @@ class Transformer(nn.Module):
         with torch.device(self.freqs_cis.device):
             self.freqs_cis = self._precompute_freqs_cis()
         nn.init.normal_(self.tok_embeddings.weight)
+        nn.init.normal_(self.catalytic_tok_embeddings.weight)
         for layer in self.layers.values():
             layer.init_weights()
         self.norm.reset_parameters()
@@ -481,7 +490,12 @@ class Transformer(nn.Module):
 
         """
         # passthrough for nonexistent layers, allows easy configuration of pipeline parallel stages
-        h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
+        if tokens.shape[1] > 1:  # check if the input tokens are multimodal in the second dimension
+            h1 = self.tok_embeddings(tokens[:,0,:]) if self.tok_embeddings else tokens
+            h2 = self.catalytic_tok_embeddings(tokens[:,1,:]) if self.catalytic_tok_embeddings else tokens
+            h = h1 + h2
+        else:
+            h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
         for layer in self.layers.values():
             h = layer(h, self.freqs_cis)
