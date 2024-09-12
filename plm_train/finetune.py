@@ -56,6 +56,7 @@ from peft.utils.other import fsdp_auto_wrap_policy
 from transformers.utils import hub, SAFE_WEIGHTS_NAME, SAFE_WEIGHTS_INDEX_NAME
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForMaskedLM, AutoConfig
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
+from transformers.models.esm.modeling_esm import EsmAttention, EsmSelfAttention
 from fastcore.parallel import parallel
 
 try:
@@ -70,6 +71,9 @@ from peft.tuners import PrefixEncoder, PromptEmbedding, PromptEncoder
 # For different model types, we'll want to import the right class for the
 # check_fn in activation checkpointing (LlamaDecoderLayer for llama models for example)
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, LLAMA_ATTENTION_CLASSES, LlamaMLP
+
+# Contextual positional encodings
+from cope_utils import CoPE, EsmSelfAttention_CoPE
 
 # Import the confit eval function
 from confit.train import evaluate
@@ -267,6 +271,12 @@ def fsdp_auto_wrap_policy_confit(model):
     auto_wrap_policy = functools.partial(_or_policy, policies=[lambda_policy, transformer_wrap_policy])
     return auto_wrap_policy
 
+# for tt in model.modules():
+#     if "Attention" in type(tt).__name__:
+#         print(type(tt))
+#         print(type(tt).__name__)
+#         print(getattr(tt, "weight", None))
+
 
 # Custom LORA module.
 class LORA(nn.Module):
@@ -308,6 +318,17 @@ class LORA(nn.Module):
         result += output
 
         return result
+
+
+# Function to replace a model's module
+def replace_module(module, target_name, model_config):
+    for child_name, child_module in module.named_children():
+        if target_name in type(child_module).__name__:
+            new_module = EsmSelfAttention_CoPE(model_config)
+            setattr(module, child_name, new_module)
+            # print(module)
+        else:
+            replace_module(child_module, target_name, model_config)
 
 
 # Save checkpoint: Modified from https://github.com/pytorch/torchtune/blob/main/recipes/lora_finetune_distributed.py
@@ -377,6 +398,7 @@ def fsdp_main(local_rank:int, world_size:int, args:Dict):
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
     torch.cuda.set_device(local_rank)
+    
 
     # Start logging
     if args["group"] is None:
@@ -422,6 +444,7 @@ def fsdp_main(local_rank:int, world_size:int, args:Dict):
         dataloader = get_dataloader(tokenizer, args)
     else:
         dataloader, valloader, testloader = get_confit_dataloader(args)
+
 
 
     # Create model
@@ -543,6 +566,11 @@ def fsdp_main(local_rank:int, world_size:int, args:Dict):
         if rank!=0 and args["low_memory"]:
             setup_quantized_meta_for_peft(model)
 
+        # Replace self-attention with self-attention with CoPE
+        # TODO: To make this work on smaller GPU memories, we have to optimize the memory usage. It works currently only on 320GB GPU memory (4 X A100)
+        # replace_module(model, "EsmSelfAttention", model.config)
+
+        # Modify model 
         model = get_peft_model(model, peft_config)
 
         if rank==0:
@@ -706,27 +734,29 @@ def fsdp_main(local_rank:int, world_size:int, args:Dict):
             if args["dataset"] == "confit" and epoch == 0:
                 with torch.no_grad():
                     model.eval()
-                    # Validation
-                    print(f"validating_start")
+                    print(f"Validating")
                     sr = evaluate(model, valloader, tokenizer, accelerator="fsdp")
                     print(f'========epoch{epoch}; val spearman correlation :{sr}=================')
                     logger.log({"val_spearman": sr}, rank)
                     # Test
-                    print(f"testing_test")
+                    print(f"Testing")
                     sr = evaluate(model, testloader, tokenizer, accelerator="fsdp")
                     print(f'========epoch{epoch}; test spearman correlation :{sr}=================')
                     logger.log({"test_spearman": sr}, rank)
 
-                    # Save before training
-                    save_checkpoint(    
-                        model,
-                        optimizer,
-                        epoch=-1,
-                        total_epochs=args['num_epochs'],
-                        rank=rank,
-                        output_dir=args["output_dir"],
-                    )
+                    # save model    
+                    if 1:
+                        save_checkpoint(    
+                            model,
+                            optimizer,
+                            epoch = epoch,
+                            total_epochs = args['num_epochs'],
+                            rank = rank,
+                            output_dir = args["output_dir"]
+                        )
+                        # dist.barrier()  
                     model.train()
+            
 
             
             # Run through all batches
@@ -913,7 +943,7 @@ def fsdp_main(local_rank:int, world_size:int, args:Dict):
                     logger.log({"test_spearman": sr}, rank)
 
                     # save model    
-                    if args["model_save_interval"] == 0:
+                    if 1:
                         save_checkpoint(    
                             model,
                             optimizer,
