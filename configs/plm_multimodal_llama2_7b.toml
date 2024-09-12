@@ -18,12 +18,21 @@ enable_color_printing = true
 enable_tensorboard = true
 save_tb_folder = "tb"
 
+[datasets]
+catalytic_seq_names = ""
+catalytic_sites_names = ""
+solubility_train_seq_names = "netsolp/PSI_Biology/pET_full_without_his_tag_consolidated.fasta"
+solubility_train_sasa_data = "netsolp/PSI_Biology/pET_full_without_his_tag_sasa_data_consolidated.npz"
+solubility_val_seq_names = "netsolp/PSI_Biology/NESG_testset_sasa_data_consolidated.fasta"
+solubility_val_sasa_data = "netsolp/PSI_Biology/NESG_testset_sasa_data_consolidated.npz"
+
 [model]
 name = "llama2"
 flavor = "7B"
 norm_type = "fused_rmsnorm"  # layernorm / np_layernorm / rmsnorm / fused_rmsnorm
 tokenizer_path = "./torchtitan/datasets/tokenizer/tokenizer.model"
-final_output = "catalytic-sites"  # can be amino-acids or catalytic-sites or both
+# final_output = "catalytic-sites"  # can be amino-acids or catalytic-sites or both
+final_output = "sasa"
 
 [optimizer]
 name = "AdamW"
