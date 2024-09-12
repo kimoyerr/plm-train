@@ -43,7 +43,7 @@ from torchtitan.parallelisms import (
 from train_utils import TrainState, build_optimizer, loss_fn, calc_f1_score
 from data_utils import split_fasta_to_json, build_hf_data_loader
 from model import ModelArgs, Transformer
-from plm_tokenizers import CatalyticTokenizer
+from plm_tokenizers import CatalyticTokenizer, SasaTokenizer
 
 try:
     import tomllib
@@ -152,38 +152,58 @@ init_distributed(job_config)
 data_dir = '/workspace/plm-train/data'
 model_inputs_dir = '/workspace/plm-train/data/model_inputs'
 
-# Create training data
-train_seq_dataset_name = "uni14230_sequences"
-train_catalytic_dataset_name = "uni14230_catalytic_sites"
-train_datasets = {}
-train_datasets["sequence"] = os.path.join(data_dir, f"{train_seq_dataset_name}.fasta")
-train_datasets["catalytic_sites"] = os.path.join(data_dir, f"{train_catalytic_dataset_name}.fasta")
-num_training_seq, _ = split_fasta_to_json(data_dir, train_datasets, model_inputs_dir, num_training_seq="all", num_validation_seq=0)
+# Create training data: Catalytic and/or Solubility
+if job_config.datasets.catalytic_seq_names!="" and job_config.datasets.catalytic_sites_names!="":
+    # Catalytic
+    train_seq_dataset_name = "uni14230_sequences"
+    train_catalytic_dataset_name = "uni14230_catalytic_sites"
+    train_datasets = {}
+    train_datasets["sequence"] = os.path.join(data_dir, f"{train_seq_dataset_name}.fasta")
+    train_datasets["catalytic_sites"] = os.path.join(data_dir, f"{train_catalytic_dataset_name}.fasta")
+    num_training_seq, _ = split_fasta_to_json(data_dir, train_datasets, model_inputs_dir, num_training_seq="all", num_validation_seq=0)
+
+if job_config.datasets.solubility_train_seq_names!="" and job_config.datasets.solubility_train_sasa_data!="":
+    # Solubility
+    train_datasets = {}
+    train_datasets["sequence"] = os.path.join(data_dir, f"{job_config.datasets.solubility_train_seq_names}")
+    train_datasets["sasa"] = os.path.join(data_dir, f"{job_config.datasets.solubility_train_sasa_data}")
+    num_training_seq, _ = split_fasta_to_json(data_dir, train_datasets, model_inputs_dir, num_training_seq="all", num_validation_seq=0)
 
 # Create validation
-val_seq_dataset_name = "uni3175_sequences"
-val_catalytic_dataset_name = "uni3175_catalytic_sites"
-val_datasets = {}
-val_datasets["sequence"] = os.path.join(data_dir, f"{val_seq_dataset_name}.fasta")
-val_datasets["catalytic_sites"] = os.path.join(data_dir, f"{val_catalytic_dataset_name}.fasta")
-_, num_validation_seq = split_fasta_to_json(data_dir, val_datasets, model_inputs_dir, num_training_seq=0, num_validation_seq="all")
+if job_config.datasets.catalytic_seq_names!="" and job_config.datasets.catalytic_sites_names!="":
+    # Catalytic
+    val_seq_dataset_name = "uni3175_sequences"
+    val_catalytic_dataset_name = "uni3175_catalytic_sites"
+    val_datasets = {}
+    val_datasets["sequence"] = os.path.join(data_dir, f"{val_seq_dataset_name}.fasta")
+    val_datasets["catalytic_sites"] = os.path.join(data_dir, f"{val_catalytic_dataset_name}.fasta")
+    _, num_validation_seq = split_fasta_to_json(data_dir, val_datasets, model_inputs_dir, num_training_seq=0, num_validation_seq="all")
 
-data_tag_dict = {
-    "seq_dataset_name": train_seq_dataset_name,  # "uni3175_sequences"
-    "catalytic_dataset_name": train_catalytic_dataset_name,
+if job_config.datasets.solubility_val_seq_names!="" and job_config.datasets.solubility_val_sasa_data!="":
+    # Solubility
+    val_datasets = {}
+    val_datasets["sequence"] = os.path.join(data_dir, f"{job_config.datasets.solubility_val_seq_names}")
+    val_datasets["sasa"] = os.path.join(data_dir, f"{job_config.datasets.solubility_val_sasa_data}")
+    _, num_validation_seq = split_fasta_to_json(data_dir, train_datasets, model_inputs_dir, num_training_seq=0, num_validation_seq="all")
+
+    data_tag_dict = {
+    "seq_dataset_name": job_config.datasets.catalytic_seq_names,  # "uni3175_sequences"
+    "modes": "sasa_solubility",
     "num_training_seq": num_training_seq,
     "num_validation_seq": num_validation_seq,
 }
+
 
 # Create huggingface dataloader
 model_seed = 1
 model_name = f'facebook/esm1v_t33_650M_UR90S_{model_seed}'
 seq_tokenizer = EsmTokenizer.from_pretrained(model_name)
 catalytic_tokenizer = CatalyticTokenizer()
+sasa_tokenizer = SasaTokenizer()
 # tokenizer.add_tokens(['<bos>', '<eos>'])
 data_path = os.path.join(data_dir, 'csv')
-data_loader = build_hf_data_loader('ecoli_protein_train', model_inputs_dir, "train", seq_tokenizer, catalytic_tokenizer, batch_size=job_config.training.batch_size, seq_len=256, world_size=1, rank=0, infinite=True)
-val_data_loader = build_hf_data_loader('ecoli_protein_val', model_inputs_dir, "validation", seq_tokenizer, catalytic_tokenizer, batch_size=job_config.training.val_batch_size, seq_len=256, world_size=1, rank=0, infinite=True)
+data_loader = build_hf_data_loader('ecoli_protein_train', model_inputs_dir, "train", seq_tokenizer, catalytic_tokenizer, sasa_tokenizer, batch_size=job_config.training.batch_size, seq_len=256, world_size=1, rank=0, infinite=True)
+val_data_loader = build_hf_data_loader('ecoli_protein_val', model_inputs_dir, "validation", seq_tokenizer, catalytic_tokenizer, sasa_tokenizer, batch_size=job_config.training.val_batch_size, seq_len=256, world_size=1, rank=0, infinite=True)
 # catalytic_train_data_loader = build_hf_data_loader('ecoli_protein_train', json_dirs["catalytic_folder"], "train", catalytic_tokenizer, batch_size=job_config.training.batch_size, seq_len=256, world_size=1, rank=0, infinite=True)
 # catalytic_val_data_loader = build_hf_data_loader('ecoli_protein_val', json_dirs["catalytic_folder"], "validation", catalytic_tokenizer, batch_size=job_config.training.val_batch_size, seq_len=256, world_size=1, rank=0, infinite=True)
 
@@ -200,9 +220,10 @@ model_seed = 1
 tokenizer = EsmTokenizer.from_pretrained(model_name)
 model_config.vocab_size = len(tokenizer.all_tokens)
 model_config.catalytic_vocab_size = len(catalytic_tokenizer.all_tokens)
+model_config.sasa_vocab_size = len(sasa_tokenizer.vocab)
 model_config.max_seq_len = 256
-model_config.final_output = "catalytic-sites"
-assert model_config.final_output == "catalytic-sites"  # To raise an error if the final output is not catalytic-sites 
+model_config.final_output = "sasa"
+assert model_config.final_output == "sasa"  # To raise an error if the final output is not catalytic-sites 
 
 # Positional embeddings
 model_config.pos_emb_type = "cope"
@@ -217,6 +238,10 @@ if model_config.final_output == "catalytic-sites":
     # Normalize to 0 to 1
     class_weights = [float(i)/sum(class_weights) for i in class_weights]
     class_weights = torch.tensor(class_weights)
+elif model_config.final_output == "sasa":
+    # Get the decoded labels
+    sasa_labels = sasa_tokenizer.vocab
+    class_weights = None
 else:
     class_weights = None
 
