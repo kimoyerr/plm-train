@@ -76,7 +76,8 @@ def loss_fn(pred, labels, reduction="mean"):
 def loss_fn(pred, labels, class_weights, reduction="mean"):
         preds = pred.flatten(0, 1)
         labels = labels.flatten(0, 1)
-        class_weights = class_weights.to(preds.device)
+        if class_weights is not None:
+            class_weights = class_weights.to(preds.device)
 
         return F.cross_entropy(preds, labels, weight=class_weights, reduction=reduction)
 
