@@ -35,6 +35,8 @@ pip3 install seaborn
 cd /workspace/ConFit
 pip install -e .
 
+pip install typing-extensions==4.12.2 
+
 # Install DIsco
 cd /workspace/DisCo-CLIP
 pip install -e .
