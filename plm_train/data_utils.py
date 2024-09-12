@@ -55,6 +55,7 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
         dataset_split: Optional[str],
         tokenizer: Tokenizer,
         catalytic_tokenizer: Optional[Tokenizer],
+        sasa_tokenizer: Optional[Tokenizer],
         seq_len: int = 2048,
         world_size: int = 1,
         rank: int = 0,
@@ -68,6 +69,7 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
         self._data = split_dataset_by_node(ds, rank, world_size)
         self._tokenizer = tokenizer
         self._catalytic_tokenizer = catalytic_tokenizer
+        self._sasa_tokenizer = sasa_tokenizer
         self.seq_len = seq_len
         self.infinite = infinite
         self.num_repeats = 0
@@ -76,6 +78,7 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
         self._sample_idx = 0
         self._all_tokens: List[int] = []
         self._all_catalytic_tokens: List[int] = []
+        self._all_sasa_tokens: List[int] = []
 
     def __iter__(self):
         max_buffer_token_len = 1 + self.seq_len
@@ -85,20 +88,29 @@ class HuggingFaceProteinDataset(IterableDataset, Stateful):
                 sample_text = sample["seq"]
                 sample_tokens = self._tokenizer.encode(sample_text)
                 self._all_tokens.extend(sample_tokens)
+                
                 # Catalytic tokens if sample["catayltic_sites"] is available
-                if sample["catalytic_sites"]:
+                if sample.get("catalytic_sites"):
                     sample_catalytic_tokens = self._catalytic_tokenizer.encode(sample["catalytic_sites"])
                     self._all_catalytic_tokens.extend(sample_catalytic_tokens)
+                
+                # sasa tokens if sample["sasa"] is available
+                if sample.get("sasa"):
+                    sample_sasa_tokens = self._sasa_tokenizer.encode(sample["sasa"])
+                    self._all_sasa_tokens.extend(sample_sasa_tokens)
                 self._sample_idx += 1
 
                 while len(self._all_tokens) >= max_buffer_token_len:  # Keep going while the current tokens are larger than the seq_len for the transformer
                     x = torch.LongTensor(self._all_tokens[:max_buffer_token_len])
                     # update tokens to the remaining tokens
                     self._all_tokens = self._all_tokens[max_buffer_token_len:]
-                    # if self._all_catalytic_tokens:
-                    if 1:
+                    if self._all_catalytic_tokens != []:
+                    # if 1:
                         y = torch.LongTensor(self._all_catalytic_tokens[:max_buffer_token_len])
                         self._all_catalytic_tokens = self._all_catalytic_tokens[max_buffer_token_len:]
+                    if self._all_sasa_tokens != []:
+                        y = torch.LongTensor(self._all_sasa_tokens[:max_buffer_token_len])
+                        self._all_sasa_tokens = self._all_sasa_tokens[max_buffer_token_len:]
                     # if not self._all_catalytic_tokens:
                     #     print("No catalytic tokens")
                     input = (x[:-1], y[:-1])
@@ -178,6 +190,7 @@ def build_hf_data_loader(
     dataset_split: Optional[str],
     tokenizer: Tokenizer,
     catalytic_tokenizer: Optional[Tokenizer],
+    sasa_tokenizer: Optional[Tokenizer],
     batch_size: int,
     seq_len: int,
     world_size,
@@ -185,7 +198,7 @@ def build_hf_data_loader(
     infinite: bool = True,
 ):
     hf_ds = HuggingFaceProteinDataset(
-        dataset_name, dataset_path, dataset_split, tokenizer, catalytic_tokenizer, seq_len, world_size, rank, infinite
+        dataset_name, dataset_path, dataset_split, tokenizer, catalytic_tokenizer, sasa_tokenizer, seq_len, world_size, rank, infinite
     )
 
     return DPAwareDataLoader(rank, hf_ds, batch_size=batch_size)
